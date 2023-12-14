@@ -1,5 +1,5 @@
 """
-A simple example for VLC python bindings using PyQt5.
+A simple example for VLC python bindings using PyQt6.
 
 Author: Saveliy Yusufov, Columbia University, sy2685@columbia.edu
 Date: 25 December 2018
@@ -11,16 +11,16 @@ import sys
 
 from pathlib import Path
 
-from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt6 import QtWidgets, QtGui, QtCore
 import vlc
 
 
 def debug_trace():
     """Set a tracepoint in the Python debugger that works with Qt"""
-    from PyQt5.QtCore import pyqtRemoveInputHook
+    from PyQt6.QtCore import pyqtRemoveInputHook
 
     # Or for Qt5
-    # from PyQt5.QtCore import pyqtRemoveInputHook
+    # from PyQt6.QtCore import pyqtRemoveInputHook
 
     from pdb import set_trace
 
@@ -37,7 +37,7 @@ class Player(QtWidgets.QMainWindow):
         self.setWindowTitle("Media Player")
 
         # Create a basic vlc instance
-        self.instance = vlc.Instance()
+        self.instance = vlc.Instance(["--no-xlib"])
 
         self.media = None
 
@@ -60,11 +60,11 @@ class Player(QtWidgets.QMainWindow):
             self.videoframe = QtWidgets.QFrame()
 
         self.palette = self.videoframe.palette()
-        self.palette.setColor(QtGui.QPalette.Window, QtGui.QColor(0, 0, 0))
+        # self.palette.setColor(QtGui.QPalette.Window, QtGui.QColor(0, 0, 0))
         self.videoframe.setPalette(self.palette)
         self.videoframe.setAutoFillBackground(True)
 
-        self.positionslider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+        self.positionslider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal, self)
         self.positionslider.setToolTip("Position")
         self.positionslider.setMaximum(1000)
         self.positionslider.sliderMoved.connect(self.set_position)
@@ -86,7 +86,7 @@ class Player(QtWidgets.QMainWindow):
         self.deleteAndPlayNextButton.clicked.connect(self.deleteAndPlayNext)
 
         self.hbuttonbox.addStretch(1)
-        self.volumeslider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
+        self.volumeslider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal, self)
         self.volumeslider.setMaximum(100)
         self.volumeslider.setValue(self.mediaplayer.audio_get_volume())
         self.volumeslider.setToolTip("Volume")
@@ -106,8 +106,8 @@ class Player(QtWidgets.QMainWindow):
         file_menu = menu_bar.addMenu("File")
 
         # Add actions to file menu
-        open_action = QtWidgets.QAction("Load Video", self)
-        close_action = QtWidgets.QAction("Close App", self)
+        open_action = QtGui.QAction("Load Video", self)
+        close_action = QtGui.QAction("Close App", self)
         file_menu.addAction(open_action)
         file_menu.addAction(close_action)
 
@@ -152,8 +152,9 @@ class Player(QtWidgets.QMainWindow):
         self.deleteAndPlayNextButton.setText("Delete and Play next")
 
     def playNext(self):
-        self.currentFilepath = self.playlist.pop(0)
-        self.playMedia(self.currentFilepath)
+        if self.playlist:
+            self.currentFilepath = self.playlist.pop(0)
+            self.playMedia(self.currentFilepath)
 
     def open_file(self):
         """Open a media file in a MediaPlayer
@@ -168,6 +169,18 @@ class Player(QtWidgets.QMainWindow):
         self.playMedia(filename[0])
 
     def playMedia(self, filename):
+        # The media player has to be 'connected' to the QFrame (otherwise the
+        # video would be displayed in it's own window). This is platform
+        # specific, so we must give the ID of the QFrame (or similar object) to
+        # vlc. Different platforms have different functions for this
+        if platform.system() == "Linux":  # for Linux using the X Server
+            print(f"winId: {int(self.videoframe.winId())}")
+            self.mediaplayer.set_xwindow(int(self.videoframe.winId()))
+        elif platform.system() == "Windows":  # for Windows
+            self.mediaplayer.set_hwnd(int(self.videoframe.winId()))
+        elif platform.system() == "Darwin":  # for MacOS
+            self.mediaplayer.set_nsobject(int(self.videoframe.winId()))
+
         # getOpenFileName returns a tuple, so use only the actual file name
         self.media = self.instance.media_new(filename)
 
@@ -180,16 +193,6 @@ class Player(QtWidgets.QMainWindow):
         # Set the title of the track as window title
         self.setWindowTitle(self.media.get_meta(0))
 
-        # The media player has to be 'connected' to the QFrame (otherwise the
-        # video would be displayed in it's own window). This is platform
-        # specific, so we must give the ID of the QFrame (or similar object) to
-        # vlc. Different platforms have different functions for this
-        if platform.system() == "Linux":  # for Linux using the X Server
-            self.mediaplayer.set_xwindow(int(self.videoframe.winId()))
-        elif platform.system() == "Windows":  # for Windows
-            self.mediaplayer.set_hwnd(int(self.videoframe.winId()))
-        elif platform.system() == "Darwin":  # for MacOS
-            self.mediaplayer.set_nsobject(int(self.videoframe.winId()))
         self.play_pause()
 
     def set_volume(self, volume):
@@ -231,7 +234,7 @@ class Player(QtWidgets.QMainWindow):
                 self.stop()
 
     def playAll(self, dirPath):
-        self.playlist = [str(p) for p in Path(dirPath).glob("*.webm")]
+        self.playlist = [str(p) for p in Path(dirPath).glob("*.*")]
         self.playNext()
 
 
@@ -242,8 +245,8 @@ def main():
     player = Player()
     player.show()
     player.resize(640, 480)
-    player.playAll("/Users/rajaravivarma/Github/youtube-dl-parallel/")
-    sys.exit(app.exec_())
+    player.playAll("/home/raja/Videos/Videos")
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

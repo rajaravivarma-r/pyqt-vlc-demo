@@ -8,8 +8,8 @@ ptpython = "*"
 black = "*"
 
 [packages]
-pyqt5 = "*"
+pyqt6 = "*"
 python-vlc = "*"
 
 [requires]
-python_version = "3.6"
+python_version = "3.11"
